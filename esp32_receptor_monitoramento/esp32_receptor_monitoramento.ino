@@ -90,6 +90,13 @@ bool novoPacoteRecebido = false;
 unsigned long ultimoRecebimento = 0;
 const unsigned long tempoTimeout = 5000;
 
+// Controle nao-bloqueante da piscada do LED branco ao receber pacote ESPNOW.
+// O callback roda no contexto da task de WiFi/LWIP; um delay() ali dentro
+// bloqueia essa task e pode causar perda de pacotes ou watchdog. Em vez de
+// bloquear, o callback so liga o LED e marca ate quando ele deve ficar
+// aceso; o loop() desliga quando o tempo passar.
+unsigned long ledPiscaAte = 0;
+
 // =======================
 // CALLBACK ESPNOW
 // =======================
@@ -101,10 +108,10 @@ void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, in
     novoPacoteRecebido = true;
     ultimoRecebimento = millis();
 
-    // Piscada rapida = recebeu pacote ESPNOW
+    // Piscada rapida = recebeu pacote ESPNOW (nao-bloqueante: so liga o LED
+    // e agenda o desligamento; quem desliga e o loop())
     digitalWrite(pinoLEDBranco, HIGH);
-    delay(80);
-    digitalWrite(pinoLEDBranco, LOW);
+    ledPiscaAte = millis() + 80;
   }
 }
 
@@ -293,6 +300,14 @@ void loop() {
 
     mostrarPacoteSerial(ultimoPacote);
     enviarParaSupabase(ultimoPacote);
+  }
+
+  // Desliga o LED branco da piscada de recebimento sem bloquear o loop
+  // (contraparte nao-bloqueante do que era feito com delay() dentro do
+  // callback onDataRecv)
+  if (ledPiscaAte > 0 && millis() > ledPiscaAte) {
+    digitalWrite(pinoLEDBranco, LOW);
+    ledPiscaAte = 0;
   }
 
   if (ultimoRecebimento > 0 && millis() - ultimoRecebimento > tempoTimeout) {
