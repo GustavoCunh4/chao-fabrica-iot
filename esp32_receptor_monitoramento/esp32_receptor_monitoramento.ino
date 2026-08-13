@@ -21,6 +21,47 @@ String supabaseKey = "SUA_SUPABASE_ANON_PUBLIC_KEY";
 // Nome da tabela criada no Supabase
 String tabelaSupabase = "leituras_iot";
 
+// Certificado da CA raiz usada pela cadeia TLS do Supabase (ISRG Root X1,
+// Let's Encrypt). Verificado em 2026-08-13 via
+// `openssl s_client -connect supabase.co:443 -showcerts`, PEM baixado
+// diretamente de https://letsencrypt.org/certs/isrgrootx1.pem. Fixar a CA
+// raiz (em vez do leaf/intermediario) e uma escolha de baixa manutencao:
+// raizes trocam em escala de decada, nao a cada 60-90 dias como os
+// certificados de folha do Let's Encrypt. O ISRG Root X1 e valido ate 2035.
+static const char* SUPABASE_ROOT_CA = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW
+T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH
+B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC
+B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv
+KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn
+OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn
+jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw
+qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI
+rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV
+HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq
+hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL
+ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ
+3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK
+NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5
+ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur
+TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC
+jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc
+oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
+4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
+mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
+emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+-----END CERTIFICATE-----
+)EOF";
+
 // =======================
 // LED BRANCO DO RECEPTOR
 // =======================
@@ -117,8 +158,28 @@ void enviarParaSupabase(struct_message dados) {
     }
   }
 
+  // Fixamos a CA raiz em vez de chamar client.setInsecure(). setInsecure()
+  // desativa toda a validacao do certificado do servidor, o que abre a
+  // conexao a ataques man-in-the-middle (qualquer certificado, de qualquer
+  // emissor, seria aceito). setCACert() valida a cadeia apresentada pelo
+  // Supabase contra a raiz ISRG Root X1 acima.
+  //
+  // Ressalva honesta: supabaseUrl acima ainda e um placeholder
+  // (SEU-PROJETO.supabase.co), entao esta cadeia foi confirmada contra o
+  // dominio apex supabase.co, nao contra o projeto real que sera usado em
+  // producao, e o handshake nunca foi testado em hardware (sem placa
+  // disponivel no momento desta mudanca). Se o projeto real estiver atras
+  // de um dominio customizado (ex.: Cloudflare na frente do Supabase), a
+  // cadeia pode ser diferente.
+  //
+  // Se o Monitor Serial mostrar falha de conexao HTTPS (erro mbedTLS por
+  // volta do connect/handshake), NAO volte para client.setInsecure() sem
+  // deixar isso explicito no codigo e no commit. Em vez disso, rode
+  // `openssl s_client -connect SEU-PROJETO.supabase.co:443 -showcerts`
+  // contra o dominio real do projeto, confirme a cadeia apresentada e
+  // troque o PEM de SUPABASE_ROOT_CA se ela for diferente da usada aqui.
   WiFiClientSecure client;
-  client.setInsecure();
+  client.setCACert(SUPABASE_ROOT_CA);
 
   HTTPClient http;
 
